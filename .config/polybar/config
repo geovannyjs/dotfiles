@@ -1,8 +1,8 @@
 
 [colors]
-background = #00303030
-background-transparent = #00303030
-background-alt = #c0303030
+background = #000000
+background-transparent = #000000
+background-alt = #000000
 background-alt-2 = #ff5fafcf
 foreground = #eeeeee
 foreground-alt = #c1c2c3
