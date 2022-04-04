@@ -57,6 +57,7 @@ call plug#begin()
   Plug 'jiangmiao/auto-pairs'
   Plug 'ap/vim-css-color'
   Plug 'preservim/nerdtree'
+  Plug 'tpope/vim-fugitive'
 call plug#end()
 
 colorscheme eldar
