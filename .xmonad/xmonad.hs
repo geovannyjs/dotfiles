@@ -43,6 +43,7 @@ main = do
       ,((0, xF86XK_AudioRaiseVolume), spawn "pactl set-sink-volume @DEFAULT_SINK@ +2%")
       ,((0, xF86XK_MonBrightnessDown), spawn "xbacklight -dec 10")
       ,((0, xF86XK_MonBrightnessUp), spawn "xbacklight -inc 10")
+      ,((mod4Mask, xK_p), spawn "rofi -theme ~/.config/rofi/theme.rasi -show run")
       ,((mod4Mask, xK_b), SM.submap . M.fromList $ [
         ((0, xK_t), toggleWindowSpacingEnabled >> toggleScreenSpacingEnabled)
         ,((0, xK_i), incScreenWindowSpacing 5)
