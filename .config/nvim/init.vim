@@ -1,5 +1,6 @@
 syntax on
 
+set t_Co=256
 set background=dark
 
 " Uncomment the following to have Vim jump to the last position when
@@ -46,11 +47,12 @@ set title
 set ttimeoutlen=0
 set wildmenu
 
+
 " Plugins
 call plug#begin()
   " Appearance
   Plug 'itchyny/lightline.vim'
-  Plug 'agude/vim-eldar'
+  Plug 'NLKNguyen/papercolor-theme'
 
   " Utilities
   Plug 'sheerun/vim-polyglot'
@@ -58,17 +60,40 @@ call plug#begin()
   Plug 'ap/vim-css-color'
   Plug 'preservim/nerdtree'
   Plug 'tpope/vim-fugitive'
+
+  " LSP
+  Plug 'neovim/nvim-lspconfig'
+
 call plug#end()
 
-colorscheme eldar
+colorscheme PaperColor
 
 " Change lightline color theme
-"let g:lightline = { 'colorscheme': 'wombat' }
+let g:lightline = { 'colorscheme': 'PaperColor' }
+
 
 " NERDTree show hidden files
 let NERDTreeShowHidden=1
 
 nnoremap <F5> :NERDTreeToggle<CR>
+
+
+" Lua
+lua << EOF
+
+  require'lspconfig'.tsserver.setup{}
+
+  vim.diagnostic.config({
+    virtual_text = false
+  })
+
+  -- Show line diagnostics automatically in hover window
+  vim.o.updatetime = 250
+  vim.cmd [[autocmd CursorHold,CursorHoldI * lua vim.diagnostic.open_float(nil, {focus=false})]]
+
+EOF
+
+
 
 " Source a global configuration file if available
 "if filereadable("/etc/vim/vimrc.local")
