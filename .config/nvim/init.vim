@@ -60,6 +60,7 @@ call plug#begin()
   Plug 'jiangmiao/auto-pairs'
   Plug 'ap/vim-css-color'
   Plug 'preservim/nerdtree'
+  Plug 'jistr/vim-nerdtree-tabs'
   Plug 'tpope/vim-fugitive'
 
   " LSP
@@ -81,13 +82,13 @@ call plug#end()
 colorscheme PaperColor
 
 " Change lightline color theme
-let g:lightline = { 'colorscheme': 'PaperColor' }
+let g:lightline = { 'colorscheme': 'PaperColor', 'active': { 'left': [[ 'mode', 'paste' ], [ 'readonly', 'relativepath', 'modified' ]] }}
 
 
 " NERDTree show hidden files
 let NERDTreeShowHidden=1
 
-nnoremap <F5> :NERDTreeToggle<CR>
+nnoremap <F5> :NERDTreeMirrorToggle<CR>
 
 
 " Lua
