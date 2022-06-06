@@ -158,14 +158,25 @@ lua << EOF
     })
   })
 
+  local map = function(type, key, value)
+    vim.api.nvim_buf_set_keymap(0,type,key,value,{noremap = true, silent = true});
+  end
+
   local custom_attach = function(client)
     print("LSP started.");
+
+    map('n','md','<cmd>lua vim.lsp.buf.definition()<CR>')
+    map('n','mh','<cmd>lua vim.lsp.buf.hover()<CR>')
+    map('n','ms','<cmd>lua vim.lsp.buf.signature_help()<CR>')
+    map('n','mt','<cmd>lua vim.lsp.buf.type_definition()<CR>')
+
   end
 
   -- Setup lspconfig.
   local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
   require('lspconfig')['tsserver'].setup {
     on_attach = custom_attach,
+    root_dir = vim.loop.cwd,
     capabilities = capabilities
   }
 
