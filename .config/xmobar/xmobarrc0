@@ -1,0 +1,37 @@
+Config { 
+  overrideRedirect = False
+  , allDesktops = False
+  , alpha = 255
+  , font = "Hack Nerd Font Mono 8"
+  , additionalFonts = [
+    "Symbols Nerd Font Mono 9"
+  ],
+  , border = NoBorder
+  , bgColor  = "#000000"
+  , fgColor  = "#ffffff"
+  , position = TopSize L 100 25
+  , commands = [
+    Run BatteryP ["BAT0"][
+      "-t", "<left>% <acstatus>"
+      , "--"
+      , "-L", "70", "-l", "red"
+      , "-H", "80", "-h", "green"
+      , "-m", "white"
+      , "-p", "green"
+      , "-a", "notify-send -u critical 'Battery running out!!'",
+      "-A", "5"] 600,
+    Run Alsa "default" "Master" [ 
+      "--template", "<volumestatus>"
+      , "--suffix", "True"
+      , "--"
+      , "--on", ""
+    ]
+    , Run Com "/home/geovanny/.config/xmobar/mic-status.sh" [] "mic" 50
+    , Run Brightness ["-t", "<percent>%", "--", "-D", "intel_backlight"] 50
+    , Run Date "%a %Y-%m-%d %H:%M:%S" "date" 10
+    , Run XPropertyLog "_XMONAD_LOG_0"
+  ]
+  , sepChar  = "%"
+  , alignSep = "}{"
+  , template = " %_XMONAD_LOG_0% }{ <fn=1><fc=#ffffff>󰕾</fc></fn> %alsa:default:Master%   <fn=1><fc=#ffffff></fc></fn> %mic%  <fn=1><fc=#ffffff>󰃟</fc></fn> %bright%   <fn=1><fc=#ffffff>󱊣</fc></fn> %battery%   <fn=1><fc=#ffffff>󰸗</fc></fn> %date% "
+}

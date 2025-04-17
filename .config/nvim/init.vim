@@ -1,67 +1,61 @@
-syntax on
+syntax enable
 
-set t_Co=256
+" background
 set background=dark
 
-" Uncomment the following to have Vim jump to the last position when
-" reopening a file
-"au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
-
 " Hidden chars
-"set listchars=tab:→\ ,space:·,nbsp:␣,trail:•,eol:¶,precedes:«,extends:»
 set listchars=trail:·,tab:»»
 set list
 
-" Uncomment the following to have Vim load indentation rules and plugins
-" according to the detected filetype.
-filetype plugin indent on
+" Tab config - force two spaces for any language/content
+autocmd VimEnter * set expandtab | set shiftwidth=2 | set softtabstop=2 | set tabstop=2
 
-" Tab config
-set expandtab
-set shiftwidth=2
-set softtabstop=2
-set tabstop=2
-
-" Python should respect my style
-let g:python_recommended_style = 0
-
-" The following are commented out as they cause vim to behave a lot
-" differently from regular Vi. They are highly recommended though.
-set noshowmode " Disable show mode, the lightline plugin show the mode alredy
-set showcmd " Show (partial) command in status line.
-set showmatch " Show matching brackets.
-"set ignorecase " Do case insensitive matching
-"set smartcase " Do smart case matching
-"set incsearch " Incremental search
-"set autowrite " Automatically save before commands like :next and :make
-set mouse=a " Enable mouse usage (all modes)
-
-set clipboard=unnamedplus
+"" completion behavior
 set completeopt=menu,menuone,noselect
-"set cursorline
-set hidden " Hide buffers when they are abandoned
+
+" required by nvim-colorizer.lua
+set termguicolors
+
+"" General
 set number
-"set relativenumber
 set splitbelow splitright
-set title
-set ttimeoutlen=0
-set wildmenu
 
+" http://vim.wikia.com/wiki/Highlight_current_line
+autocmd BufEnter * setlocal cursorline
+autocmd WinEnter * setlocal cursorline
+autocmd BufLeave * setlocal nocursorline
+autocmd WinLeave * setlocal nocursorline
 
+" change the leader key from "\" to ";"
+let mapleader=";"
+
+" use ;; for escape
+" http://vim.wikia.com/wiki/Avoid_the_escape_key
+inoremap ;; <Esc>
+
+" FZF Utils
+nnoremap <silent> <leader>fb :FZFBuffers<CR>
+nnoremap <silent> <leader>fc :FZFCommands<CR>
+nnoremap <silent> <leader>ff :FZF<CR>
+nnoremap <silent> <leader>fh :FZFHistory<CR>
+nnoremap <silent> <leader>fr :FZFRg<CR>
+nnoremap <silent> <leader>fw :FZFWindows<CR>
+
+" FZF namespace
+let g:fzf_command_prefix = 'FZF'
+"
 " Plugins
 call plug#begin()
 
+  " Code AST
+  Plug 'nvim-treesitter/nvim-treesitter', { 'do': ':TSUpdate' }
+
   " Appearance
-  Plug 'itchyny/lightline.vim'
-  Plug 'NLKNguyen/papercolor-theme'
+  Plug 'folke/tokyonight.nvim'
+  Plug 'nvim-lualine/lualine.nvim'
 
   " Utilities
-  Plug 'sheerun/vim-polyglot'
-  Plug 'jiangmiao/auto-pairs'
-  Plug 'ap/vim-css-color'
-  Plug 'preservim/nerdtree'
-  Plug 'jistr/vim-nerdtree-tabs'
-  Plug 'tpope/vim-fugitive'
+  Plug 'norcalli/nvim-colorizer.lua'
 
   " LSP
   Plug 'neovim/nvim-lspconfig'
@@ -77,73 +71,78 @@ call plug#begin()
   Plug 'hrsh7th/cmp-vsnip'
   Plug 'hrsh7th/vim-vsnip'
 
+  " Fuzzy search
+  " To update: :PlugUpdate fzf
+  Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': { -> fzf#install() } }
+  Plug 'junegunn/fzf.vim'
+
 call plug#end()
 
-colorscheme PaperColor
+" =====================================
+" Custom find
+" =====================================
+" --column: Show column number
+" --line-number: Show line number
+" --no-heading: Do not show file headings in results
+" --fixed-strings: Search term as a literal string
+" --ignore-case: Case insensitive search
+" --no-ignore: Do not respect .gitignore, etc...
+" --hidden: Search hidden files and folders
+" --follow: Follow symlinks
+" --glob: Additional conditions for search (in this case ignore everything in the .git/ folder)
+" --color: Search color options
+command! -bang -nargs=* Find call fzf#vim#grep('rg --column --line-number --no-heading --fixed-strings --ignore-case --hidden --follow --glob "!.git/*" --color "always" '.shellescape(<q-args>), 1, <bang>0)
 
-" Change lightline color theme
-let g:lightline = { 'colorscheme': 'PaperColor', 'active': { 'left': [[ 'mode', 'paste' ], [ 'readonly', 'relativepath', 'modified' ]] }}
+lua <<EOF
 
+  require'nvim-treesitter.configs'.setup {
+    ensure_installed = { 'javascript', 'haskell', 'lua', 'typescript', 'tsx' },
+    highlight = {
+      enable = true
+    }
+  }
 
-" NERDTree show hidden files
-let NERDTreeShowHidden=1
-
-nnoremap <F5> :NERDTreeMirrorToggle<CR>
-
-
-" Lua
-lua << EOF
-
-  require'lspconfig'.tsserver.setup{}
-
-  vim.diagnostic.config({
-    virtual_text = false
+  require'tokyonight'.setup({
+    transparent = true
   })
 
-  -- Show line diagnostics automatically in hover window
-  vim.o.updatetime = 250
-  vim.cmd [[autocmd CursorHold,CursorHoldI * lua vim.diagnostic.open_float(nil, {focus=false})]]
+  require'lualine'.setup()
 
+  require'colorizer'.setup()
 
-  -- Setup nvim-cmp.
+  -- Set up nvim-cmp.
   local cmp = require'cmp'
+
+  -- haskell
+  require'lspconfig'.hls.setup{}
+
+  -- typescript
+  require'lspconfig'.ts_ls.setup{}
 
   cmp.setup({
     snippet = {
       expand = function(args)
         vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
-      end,
+      end
     },
-    mapping = {
-      ['<C-b>'] = cmp.mapping(cmp.mapping.scroll_docs(-4), { 'i', 'c' }),
-      ['<C-f>'] = cmp.mapping(cmp.mapping.scroll_docs(4), { 'i', 'c' }),
-      ['<C-Space>'] = cmp.mapping(cmp.mapping.complete(), { 'i', 'c' }),
-      ['<C-y>'] = cmp.config.disable, -- Specify `cmp.config.disable` if you want to remove the default `<C-y>` mapping.
-      ['<C-e>'] = cmp.mapping({
-        i = cmp.mapping.abort(),
-        c = cmp.mapping.close(),
-      }),
-      ['<CR>'] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
-    },
+    mapping = cmp.mapping.preset.insert({
+      ['<C-b>'] = cmp.mapping.scroll_docs(-4),
+      ['<C-f>'] = cmp.mapping.scroll_docs(4),
+      ['<C-Space>'] = cmp.mapping.complete(),
+      ['<C-e>'] = cmp.mapping.abort(),
+      ['<CR>'] = cmp.mapping.confirm({ select = false }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+    }),
     sources = cmp.config.sources({
       { name = 'nvim_lsp' },
-      { name = 'vsnip' }, -- For vsnip users.
+      { name = 'vsnip' } -- For vsnip users.
     }, {
-      { name = 'buffer' },
+      { name = 'buffer' }
     })
   })
 
-  -- Set configuration for specific filetype.
-  cmp.setup.filetype('gitcommit', {
-    sources = cmp.config.sources({
-      { name = 'cmp_git' }, -- You can specify the `cmp_git` source if you were installed it.
-    }, {
-      { name = 'buffer' },
-    })
-  })
-
-  -- Use buffer source for `/` (if you enabled `native_menu`, this won't work anymore).
-  cmp.setup.cmdline('/', {
+  -- Use buffer source for `/` and `?` (if you enabled `native_menu`, this won't work anymore).
+  cmp.setup.cmdline({ '/', '?' }, {
+    mapping = cmp.mapping.preset.cmdline(),
     sources = {
       { name = 'buffer' }
     }
@@ -151,11 +150,13 @@ lua << EOF
 
   -- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore).
   cmp.setup.cmdline(':', {
+    mapping = cmp.mapping.preset.cmdline(),
     sources = cmp.config.sources({
       { name = 'path' }
     }, {
       { name = 'cmdline' }
-    })
+    }),
+    matching = { disallow_symbol_nonprefix_matching = false }
   })
 
   local map = function(type, key, value)
@@ -165,16 +166,25 @@ lua << EOF
   local custom_attach = function(client)
     print("LSP started.");
 
-    map('n','md','<cmd>lua vim.lsp.buf.definition()<CR>')
-    map('n','mh','<cmd>lua vim.lsp.buf.hover()<CR>')
-    map('n','ms','<cmd>lua vim.lsp.buf.signature_help()<CR>')
-    map('n','mt','<cmd>lua vim.lsp.buf.type_definition()<CR>')
+    map('n','<leader>ld','<cmd>tab split | lua vim.lsp.buf.definition()<CR>')
+    map('n','<leader>lh','<cmd>lua vim.lsp.buf.hover()<CR>')
+    map('n','<leader>ls','<cmd>lua vim.lsp.buf.signature_help()<CR>')
+    map('n','<leader>lt','<cmd>tab split | lua vim.lsp.buf.type_definition()<CR>')
+
+    local opts = { buffer = bufnr, noremap = true, silent = true }
+    vim.keymap.set('n', '<leader>lp', vim.diagnostic.goto_prev, opts)
+    vim.keymap.set('n', '<leader>ln', vim.diagnostic.goto_next, opts)
 
   end
 
-  -- Setup lspconfig.
-  local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
-  require('lspconfig')['tsserver'].setup {
+  -- Set up lspconfig.
+  local capabilities = require('cmp_nvim_lsp').default_capabilities()
+  require'lspconfig'.ts_ls.setup {
+    on_attach = custom_attach,
+    root_dir = vim.loop.cwd,
+    capabilities = capabilities
+  }
+  require'lspconfig'.hls.setup {
     on_attach = custom_attach,
     root_dir = vim.loop.cwd,
     capabilities = capabilities
@@ -182,9 +192,5 @@ lua << EOF
 
 EOF
 
-
-
-" Source a global configuration file if available
-"if filereadable("/etc/vim/vimrc.local")
-"  source /etc/vim/vimrc.local
-"endif
+" Color scheme
+colorscheme tokyonight-night
