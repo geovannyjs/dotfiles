@@ -71,6 +71,7 @@ myPromptConfig = def {
   , fgColor = white
   , historySize = 0
   , promptBorderWidth = 0
+  , height = 50
   , font = "xft:Hack Nerd Font Mono:size=9"
 }
 
@@ -111,5 +112,13 @@ barSpawner 1 = pure xmobar1
 myManageHook :: ManageHook
 myManageHook = composeAll [
   className =? "Gimp" --> doCenterFloat
-  , className =? "xfreerdp" --> doCenterFloat
-  , isDialog --> doCenterFloat ]
+  ,className =? "xfreerdp" --> doCenterFloat
+  ,isDialog --> doCenterFloat ]
+
+{-
+
+cabal update
+cabal install --package-env=$HOME/.config/xmonad --lib base xmonad xmonad-contrib
+cabal install --overwrite-policy=always --package-env=$HOME/.config/xmonad xmonad
+
+-}
