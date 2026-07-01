@@ -178,7 +178,32 @@ lua <<EOF
       keywords = { bold = true },
     },
     on_colors = function(colors)
-      colors.comment = "#7a88cf"  -- brighten comments for readability
+      colors.comment = "#8b99df"  -- brighten comments for readability
+    end,
+    on_highlights = function(hl, c)
+      -- Make comments brighter for better readability
+      hl.Comment = { fg = c.comment, italic = true }
+      
+      -- Increase contrast for split dividers
+      hl.WinSeparator = { fg = c.magenta, bold = true }
+
+      hl.LineNr = { fg = '#777777' }  -- dim line numbers
+      hl.TabLine = { fg = '#777777' }  -- dim inactive tabline
+      hl.DiagnosticUnnecessary = { fg = '#777777' }  -- dim unnecessary diagnostics
+    end,
+  })
+
+  -- Make the native LSP inline-completion ghost text (Copilot suggestions)
+  -- clearly visible. Neovim renders it with the `ComplHint`/`ComplHintMore`
+  -- highlight groups, which by default link to `NonText`/`MoreMsg`. `NonText`
+  -- is a near-background dim gray, so suggestions are almost invisible. We
+  -- override the groups on every ColorScheme load (colorschemes reset custom
+  -- highlights, so this must re-run after the theme is applied).
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = vim.api.nvim_create_augroup('GhostTextVisible', { clear = true }),
+    callback = function()
+      vim.api.nvim_set_hl(0, 'ComplHint',     { fg = '#ddfc92', italic = true })
+      vim.api.nvim_set_hl(0, 'ComplHintMore', { fg = '#ddfc92', italic = true })
     end,
   })
 
