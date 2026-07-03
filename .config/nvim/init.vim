@@ -118,6 +118,10 @@ call plug#begin()
   Plug 'windwp/nvim-autopairs'  " auto-close brackets/quotes
   Plug 'windwp/nvim-ts-autotag' " auto-close/rename HTML/JSX tags
 
+  " GitHub Copilot as an nvim-cmp source (instead of native ghost text).
+  Plug 'zbirenbaum/copilot.lua'  " Copilot client (ghost text disabled below)
+  Plug 'zbirenbaum/copilot-cmp'  " exposes Copilot as a cmp completion source
+
   " Fuzzy search. To update the fzf binary: :PlugUpdate fzf
   Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': { -> fzf#install() } }
   Plug 'junegunn/fzf.vim'
@@ -178,32 +182,14 @@ lua <<EOF
       keywords = { bold = true },
     },
     on_colors = function(colors)
-      colors.comment = "#8b99df"  -- brighten comments for readability
+      colors.comment = "#777777"  -- brighten comments for readability
     end,
     on_highlights = function(hl, c)
       -- Make comments brighter for better readability
       hl.Comment = { fg = c.comment, italic = true }
-      
-      -- Increase contrast for split dividers
-      hl.WinSeparator = { fg = c.magenta, bold = true }
-
-      hl.LineNr = { fg = '#777777' }  -- dim line numbers
-      hl.TabLine = { fg = '#777777' }  -- dim inactive tabline
-      hl.DiagnosticUnnecessary = { fg = '#777777' }  -- dim unnecessary diagnostics
-    end,
-  })
-
-  -- Make the native LSP inline-completion ghost text (Copilot suggestions)
-  -- clearly visible. Neovim renders it with the `ComplHint`/`ComplHintMore`
-  -- highlight groups, which by default link to `NonText`/`MoreMsg`. `NonText`
-  -- is a near-background dim gray, so suggestions are almost invisible. We
-  -- override the groups on every ColorScheme load (colorschemes reset custom
-  -- highlights, so this must re-run after the theme is applied).
-  vim.api.nvim_create_autocmd('ColorScheme', {
-    group = vim.api.nvim_create_augroup('GhostTextVisible', { clear = true }),
-    callback = function()
-      vim.api.nvim_set_hl(0, 'ComplHint',     { fg = '#ddfc92', italic = true })
-      vim.api.nvim_set_hl(0, 'ComplHintMore', { fg = '#ddfc92', italic = true })
+      hl.LineNr = { fg = c.comment }  -- dim line numbers
+      hl.TabLine = { fg = c.comment }  -- dim inactive tabline
+      hl.DiagnosticUnnecessary = { fg = c.comment }  -- dim unnecessary diagnostics
     end,
   })
 
@@ -243,6 +229,17 @@ lua <<EOF
   -- --- Completion (nvim-cmp) ------------------------------------------------
   local cmp = require'cmp'
 
+  -- True only when there is non-whitespace text before the cursor. Guards the
+  -- <Tab> mapping so Tab still indents on empty lines instead of grabbing a
+  -- Copilot completion. (Modern replacement for the README's deprecated
+  -- nvim_buf_get_option call.)
+  local has_words_before = function()
+    if vim.api.nvim_get_option_value('buftype', { buf = 0 }) == 'prompt' then return false end
+    local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+    return col ~= 0
+      and vim.api.nvim_buf_get_text(0, line - 1, 0, line - 1, col, {})[1]:match('^%s*$') == nil
+  end
+
   cmp.setup({
     snippet = {
       -- Expand snippets via vsnip.
@@ -258,8 +255,36 @@ lua <<EOF
       -- Confirm the selected item. select=false means <CR> only confirms an
       -- item the user explicitly selected (a bare <CR> stays a newline).
       ['<CR>'] = cmp.mapping.confirm({ select = false }),
+      -- Move selection to the next menu item (e.g. a Copilot suggestion) when
+      -- the menu is open and there's text before the cursor; otherwise fall
+      -- through to a literal <Tab>.
+      ['<Tab>'] = vim.schedule_wrap(function(fallback)
+        if cmp.visible() and has_words_before() then
+          cmp.select_next_item({ behavior = cmp.SelectBehavior.Select })
+        else
+          fallback()
+        end
+      end),
     }),
+    -- Rank Copilot entries at the top via copilot-cmp's `prioritize` comparator,
+    -- then fall back to cmp's standard ordering.
+    sorting = {
+      priority_weight = 2,
+      comparators = {
+        require('copilot_cmp.comparators').prioritize,
+        cmp.config.compare.offset,
+        cmp.config.compare.exact,
+        cmp.config.compare.score,
+        cmp.config.compare.recently_used,
+        cmp.config.compare.locality,
+        cmp.config.compare.kind,
+        cmp.config.compare.sort_text,
+        cmp.config.compare.length,
+        cmp.config.compare.order,
+      },
+    },
     sources = cmp.config.sources({
+      { name = 'copilot' },
       { name = 'nvim_lsp' },
       { name = 'vsnip' }
     }, {
@@ -361,84 +386,38 @@ lua <<EOF
   require('nvim-ts-autotag').setup{}
 
   -- =====================================
-  -- GitHub Copilot (ghost text via native inline completion)
+  -- GitHub Copilot (as an nvim-cmp source via copilot-cmp)
   -- =====================================
-  vim.lsp.config('copilot', {
-    -- Strip GH_COPILOT_TOKEN / COPILOT_GITHUB_TOKEN from the server's env: a
-    -- GitHub fine-grained PAT (github_pat_…) does NOT grant Copilot access, and
-    -- when present it forces the server into a "NotAuthorized" state that blocks
-    -- all ghost text. Removing them makes the server fall back to the proper
-    -- OAuth device-flow session (see :CopilotSignIn below).
-    cmd = { 'env', '-u', 'GH_COPILOT_TOKEN', '-u', 'COPILOT_GITHUB_TOKEN',
-            'copilot-language-server', '--stdio' },
-    root_markers = { '.git' },
-    init_options = {
-      editorInfo = { name = 'Neovim', version = tostring(vim.version()) },
-      editorPluginInfo = { name = 'Neovim Copilot LS', version = '1.0.0' },
-    },
-    settings = {
-      telemetry = { telemetryLevel = 'off' },  -- do not send usage telemetry
-    },
-  })
-  vim.lsp.enable('copilot')
-
-  -- Turn on inline completion only for the Copilot client (other LSP servers
-  -- feed nvim-cmp instead).
-  vim.api.nvim_create_autocmd('LspAttach', {
-    group = vim.api.nvim_create_augroup('CopilotInline', { clear = true }),
-    callback = function(args)
-      local client = vim.lsp.get_client_by_id(args.data.client_id)
-      if client and client.name == 'copilot' then
-        vim.lsp.inline_completion.enable(true, { bufnr = args.buf })
+  -- copilot.lua drives the Copilot client. Its own ghost-text `suggestion` and
+  -- `panel` surfaces are disabled so that suggestions flow exclusively through
+  -- nvim-cmp (via copilot-cmp, set up next) — this is what keeps them from
+  -- fighting nvim-autopairs the way native inline ghost text did.
+  -- copilot.lua 1.515+ bundles GitHub's Copilot Language Server, which requires
+  -- Node.js 22+. The nvm-default `node` here is still v20 (and project .nvmrc
+  -- files may pin older versions), so instead of relying on PATH, point Copilot
+  -- at the newest installed Node >= 22. Falls back to plain "node".
+  local function copilot_node()
+    local newest, newest_major = nil, 21
+    for _, dir in ipairs(vim.fn.glob("~/.nvm/versions/node/v*", true, true)) do
+      local major = tonumber(dir:match("/v(%d+)%."))
+      if major and major > newest_major then
+        newest, newest_major = dir .. "/bin/node", major
       end
-    end,
-  })
-
-  -- <M-l>: accept the current ghost-text suggestion. inline_completion.get()
-  -- applies the suggestion and returns truthy; if there's none, fall through to
-  -- a literal <M-l> (expr mapping).
-  vim.keymap.set('i', '<M-l>', function()
-    if not vim.lsp.inline_completion.get() then
-      return '<M-l>'
     end
-  end, { expr = true, desc = 'Copilot: accept suggestion' })
+    return newest or "node"
+  end
 
-  -- Cycle through alternative suggestions.
-  vim.keymap.set('i', '<M-]>', function()
-    vim.lsp.inline_completion.select({ count = 1, wrap = true })
-  end, { desc = 'Copilot: next suggestion' })
+  require('copilot').setup({
+    copilot_node_command = copilot_node(),
+    suggestion = { enabled = false },
+    panel = { enabled = false },
+  })
+  -- Register the 'copilot' cmp source (referenced in cmp.setup above). Its
+  -- default `fix_pairs` stops Copilot from doubling closing brackets that
+  -- nvim-autopairs already inserts.
+  require('copilot_cmp').setup()
 
-  vim.keymap.set('i', '<M-[>', function()
-    vim.lsp.inline_completion.select({ count = -1, wrap = true })
-  end, { desc = 'Copilot: previous suggestion' })
-
-  -- One-time sign-in fallback (device flow). Usually unnecessary if already authed.
-  vim.api.nvim_create_user_command('CopilotSignIn', function()
-    local clients = vim.lsp.get_clients({ name = 'copilot' })
-    if #clients == 0 then
-      vim.notify('Copilot LSP not attached to this buffer', vim.log.levels.WARN)
-      return
-    end
-    local client = clients[1]
-    -- NOTE: must be vim.empty_dict(), not {} — Lua's {} serializes to a JSON
-    -- array ([]) and the server rejects it with "Expected object".
-    client:request('signIn', vim.empty_dict(), function(err, result)
-      if err then
-        vim.notify('Copilot signIn error: ' .. vim.inspect(err), vim.log.levels.ERROR)
-        return
-      end
-      if result and result.userCode then
-        vim.fn.setreg('+', result.userCode)
-        vim.notify('Copilot device code (copied to clipboard): ' .. result.userCode
-          .. '\nFinishing the browser flow...', vim.log.levels.INFO)
-        if result.command then
-          client:request('workspace/executeCommand', result.command, function() end)
-        end
-      else
-        vim.notify('Copilot: already signed in.', vim.log.levels.INFO)
-      end
-    end)
-  end, {})
+  -- Sign in with :Copilot auth (device flow) if Copilot reports NotAuthorized.
 
   -- --- Misc keymaps & autocmds ---------------------------------------------
 
